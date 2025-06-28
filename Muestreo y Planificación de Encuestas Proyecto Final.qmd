@@ -1,0 +1,190 @@
+---
+title: "Muestreo y Planificación de Encuestas Proyecto Final"
+author: "Grupo 7: Apolo - Roda - Da Rosa"
+format: pdf
+editor: visual
+---
+
+## introducción:
+
+En el presente trabajo se utilizará la base de datos de la Encuesta Continua de Hogares (ECH) de Uruguay correspondiente al año 2019, disponible en el repositorio del Instituto Nacional de Estadística (INE) y también proporcionada en el aula virtual del curso. El objetivo principal es aplicar herramientas de muestreo y estimación estadística para procesar información real y analizar la situación de desocupación en distintos segmentos de la población.
+
+En particular, se trabajará con los datos del primer trimestre de 2019, y se empleará tanto el diseño muestral complejo provisto por la encuesta (estratos y unidades primarias de muestreo –UPM–) como estrategias de remuestreo (Bootstrap). Se buscará estimar el total de personas desocupadas, su distribución por departamentos y la tasa de desocupación en jóvenes de 18 a 25 años, entre otros indicadores. Asimismo, se evaluará el impacto de disponer o no de la información de diseño en los intervalos de confianza obtenidos.
+
+El enfoque combina análisis descriptivo, estimación puntual, construcción de intervalos de confianza y comparación entre métodos clásicos y no paramétricos, con el objetivo de comprender la importancia del diseño muestral en la inferencia estadística aplicada a encuestas nacionales.
+
+## Se pide:
+
+1.  ***Estime el total de personas desocupadas en el primer trimestre del año y proporcione un intervalo de confianza al 95% para este total. ¿Cúanto vale el deff en este caso?***
+
+```{r}
+
+library(survey)
+library(haven)
+library(dplyr)
+
+
+encuesta <- read_sav("H_2019_Terceros.sav")
+diseno <- read_sav("ESTRATO_UPM_ECH2019.sav")
+
+base <- left_join(encuesta, diseno, by = c("numero", "anio"))
+
+
+base_trim1 <- filter(base, as.numeric(mes) %in% 1:3)
+
+base_trim1$desocupado <- ifelse(base_trim1$d11 == 2, 1, 0)
+
+# Total poblacional de desocupados
+total_pob_desocupados <- sum(base_trim1$desocupado * base_trim1$pesotri, na.rm = TRUE)
+total_pob_desocupados
+
+
+
+```
+
+Para estimar el total de personas desocupadas en el primer trimestre del año 2019, primero filtramos la base de datos para conservar únicamente los registros correspondientes a los meses de enero, febrero y marzo. A continuación, construimos una variable que identifica a las personas en situación de desocupación, de acuerdo con la codificación provista en la encuesta. Esta variable toma el valor 1 cuando la persona está desocupada y 0 en caso contrario.
+
+Una vez identificadas las personas desocupadas, calculamos el total poblacional aplicando los factores de expansión trimestrales (pesotri), que permiten proyectar los datos muestrales a toda la población. El resultado obtenido es 3967 personas, lo cual representa la estimación total de desocupados en Uruguay durante el primer trimestre de 2019 según la Encuesta Continua de Hogares.
+
+```{r}
+# Tamaño poblacional
+N <- nrow(base_trim1)
+
+# Tamaño muestral
+n <- 1000
+
+set.seed(123)
+
+s_idx <- sample(1:N, size = n, replace = FALSE)
+muestra_si <- base_trim1[s_idx, ]
+
+```
+
+```{r}
+# Crear diseño con fpc
+diseno_si <- svydesign(
+  ids = ~1,
+  probs = rep(n / N, n),
+  fpc = rep(N, n),
+  data = muestra_si
+)
+
+
+```
+
+En este paso se simula una situación en la que se realiza un muestreo aleatorio simple sin reemplazo (diseño SI) a partir de la base filtrada del primer trimestre. Para ello, se establece un tamaño muestral de 1000 personas seleccionadas al azar de entre todos los casos disponibles en ese período. Se fija una semilla para asegurar la reproducibilidad del muestreo.
+
+Una vez seleccionada la muestra, se construye el diseño muestral correspondiente utilizando la función svydesign. Allí se indica que se trata de un muestreo directo de unidades (ids = \~1), con una probabilidad de inclusión constante para todos los casos, y se especifica el factor de corrección por población finita (fpc), que en este caso es el total de unidades disponibles en la población del primer trimestre. Este diseño simulado permite luego aplicar los estimadores de la librería survey como si la muestra hubiese sido obtenida bajo un plan SI, facilitando la comparación con otros diseños.
+
+```{r}
+# Estimar total de desocupados en muestra SI
+total_si <- svytotal(~desocupado, diseno_si)
+total_si
+
+# Intervalo de confianza al 95%
+confint(total_si)
+
+# Estimar DEFF 
+svytotal(~desocupado, diseno_si, deff = TRUE)
+
+```
+
+\
+El total estimado obtenido fue de 59.724 personas, lo cual representa la cantidad proyectada de desocupados en la población según esta muestra específica. A este valor se le asocia un error estándar de 23.067, que indica el nivel de variabilidad esperada en esta estimación debido al azar del muestreo.
+
+Además, se calcula un intervalo de confianza al 95%, que va desde aproximadamente 14.5 hasta 104.9 personas. Esto significa que, bajo el supuesto del diseño SI, hay un 95% de confianza en que el verdadero total poblacional de desocupados se encuentra dentro de ese rango. La amplitud relativamente grande del intervalo sugiere una considerable incertidumbre en la estimación, probablemente por el tamaño limitado de la muestra o la baja proporción de casos desocupados.
+
+Finalmente, el efecto del diseño (DEFF) es igual a 1, lo cual es esperable en un diseño SI sin reemplazo, ya que este valor indica que la varianza del estimador es la misma que tendría bajo un muestreo aleatorio simple\
+\
+
+```{r}
+ps <- svydesign(
+  ids = ~upm_fic,
+  strata = ~estrato,
+  weights = ~pesotri,
+  data = base_trim1
+)
+
+# Estimar total y su intervalo
+svytotal(~desocupado, ps)
+confint(svytotal(~desocupado, ps))
+
+```
+
+Además del total calculado con los factores de expansión, se aplicó la función `svytotal()` sobre el diseño muestral real de la ECH, lo que permitió obtener el intervalo de confianza al 95% mediante el método clásico. El resultado fue un total de 3967 personas desocupadas, con un intervalo estimado de \[2421; 5512\].
+
+2.  **Obtenga un intervalo de confianza al 95% para el total estimado en la parte anterior utilizando el método Bootstrap y compare con el punto anterior. Obtenga la distribución empírica del estimador.**
+
+```{r}
+
+psBoot <- as.svrepdesign(ps, type = "subbootstrap", replicates = 500)
+
+
+svytotal(~desocupado, psBoot)
+confint(svytotal(~desocupado, psBoot)) 
+
+desocup_boot <- svytotal(~desocupado, psBoot, return.replicates = TRUE)
+
+hist(desocup_boot$replicates,
+     breaks = 20,
+     main = "Distribución Bootstrap del total de desocupados",
+     xlab = "Total estimado",
+     col = "skyblue",
+     border = "gray")
+
+
+sd(desocup_boot$replicates)
+
+```
+
+se aplicó el método Bootstrap para estimar nuevamente el total de personas desocupadas en el primer trimestre de 2019. Para ello, se generaron 500 replicaciones del estimador mediante remuestreo con reemplazo (subbootstrap), manteniendo la estructura del diseño estratificado por UPM.
+
+La estimación del total de desocupados resultó ser nuevamente 3967 personas, al igual que con el método clásico. El intervalo de confianza al 95% obtenido fue \[2326.8; 5607.2\], muy similar al obtenido con el enfoque anterior (\[2421; 5512\]). La desviación estándar de los pseudo-valores Bootstrap fue de aproximadamente 836.84, en línea con la estimación clásica (que también rondaba los 837).
+
+Además, se obtuvo la distribución empírica del estimador mediante un histograma de los valores generados por las replicaciones. Esta distribución presentó una forma simétrica y unimodal, centrada en torno al valor puntual estimado, sin indicios de asimetría ni sesgo significativo.
+
+En resumen, el método Bootstrap confirmó la robustez de la estimación obtenida en la primera parte. La coincidencia en el valor del total, así como la similitud de los intervalos, sugiere que el estimador se comporta de manera estable bajo distintos enfoques de estimación de varianza. La distribución empírica, a su vez, respalda el supuesto de normalidad utilizado en el método clásico.
+
+**3. Estime el total de personas desocupadas en el primer trimestre del año en
+Paysandú y proporcione un intervalo de confianza al 95% para este total.**
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+**4. Estime la tasa de desocupados en las personas de entre 18 y 25 años y
+proporcione un intervalo de confianza al 95% para esta estimación.**
+
+```{r}
+
+
+```
+
+```{r}
+
+```
+
+**5. Estime tasa de desocupados en las personas de entre 18 y 25 por departamento y proporcione un intervalo de confianza al 95% para cada dominio.**
+
+```{r}
+
+```
+
+```{r}
+
+```
+
+**6. Si no se contara con la información de las UPM y de los estratos, ¿cómo
+sería el intervalo de confianza de la parte 1)? Comente los resultados.**
+
+```{r}
+
+```
+
+```{r}
+
+```
