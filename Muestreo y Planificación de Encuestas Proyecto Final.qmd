@@ -200,7 +200,7 @@ El intervalo de confianza es un poco más amplio cuando no consideramos la infor
 
 
 La conclusion es que si no se tiene la información sobre las UPM y los estratos, se puede hacer la estimación igual, pero los intervalos de confianza son más amplios y el diseño es menos eficiente.
-
+.
 
 
 
