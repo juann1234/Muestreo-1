@@ -15,13 +15,25 @@ library(survey)
 library(haven)
 library(dplyr)
 library(here)
+library(writexl)
+
+write_xlsx(encuesta_HP, "encuesta_HP.xlsx")
 ```
 
 ```{r}
 # El link a la pagina del IME no anda...
 
 # Lectura de datos
-encuesta <- read_sav(here("Datos", "H_2019_Terceros .sav"))
+#encuesta_H <- read_sav(here("Datos", "H_2019_Terceros .sav"))
+#encuesta_P <- read_sav(here("Datos", "P_2019_Terceros.sav"))
+encuesta_HP <- read_sav(here("Datos", "HyP_2019_Terceros.sav")) # la union de los dos anteriores
+
+#encuesta_H
+#encuesta_P
+encuesta_HP
+
+
+
 diseno <- read_sav(here("Datos", "ESTRATO_UPM_ECH2019.sav"))
 #encuesta
 #diseno
@@ -35,30 +47,55 @@ diseno <- read_sav(here("Datos", "ESTRATO_UPM_ECH2019.sav"))
 La variable `ht6` representa el total de personas desocupadas en cada hogar, calculada por el sistema a partir de la información individual de los integrantes del hogar (excluyendo servicio doméstico). Esta variable incluye a todas las personas que, según la clasificación del INE, se consideran desocupadas, ya sea porque están buscando empleo y disponibles para trabajar, porque están disponibles pero no buscan, o porque buscan sin estar disponibles.\
 
 ```{r}
+set.seed(123)
 
+
+# Datos
+hogares <- encuesta_HP
 hogares_trim1 <- filter(hogares, mes %in% c(1, 2, 3))
 
-diseño <- svydesign(ids = ~1, weights = ~pesoano, data = hogares_trim1)
+#diseño <- svydesign(ids = ~1, weights = ~pesoano, data = hogares_trim1)
 
-
+# Estimar el total
+diseño <- svydesign(ids = ~1, strata = ~estred13, weights = ~pesotri, data = hogares_trim1)
 svytotal(~ht6, diseño)
+# Estimar el total
+#diseño <- svydesign(ids = ~1, weights = ~pesotri, data = hogares_trim1)
+#svytotal(~ht6, diseño)
 
+
+
+# Intervalo de confianza
 confint(svytotal(~ht6, diseño))
 
 # (DEFF)
-svytotal(~ht6, svydesign(ids = ~1, weights = ~pesoano, data = hogares_trim1), deff = TRUE)
+svytotal(~ht6, diseño, deff = TRUE)
+
+
+
 
 ```
+
+```{r}
+
+```
+
 
 se estima que en Uruguay hay aproximadamente 36.273 personas desocupadas. El intervalo de confianza al 95% para esta estimación se encuentra entre 33.807 y 38.739 personas, lo que refleja el rango dentro del cual probablemente se ubica el verdadero total poblacional. El efecto de diseño (DEFF) fue de 1,341, lo cual indica que la varianza del estimador bajo el diseño muestral utilizado es un 34,1% mayor que la que se tendría bajo un muestreo aleatorio simple
 
 \
 
+
+
+
+
+
+
 2.  **Obtenga un intervalo de confianza al 95% para el total estimado en la parte anterior utilizando el método Bootstrap y compare con el punto anterior. Obtenga la distribución empírica del estimador.**
 
 ```{r}
 
-diseño <- svydesign(ids = ~1, weights = ~pesoano, data = hogares_trim1)
+#diseño <- svydesign(ids = ~1, weights = ~pesoano, data = hogares_trim1)
 
 
 set.seed(123)
@@ -114,24 +151,63 @@ A partir del diseño muestral aplicado a los hogares del primer trimestre y util
 # la variable d23 indica PERSONAS DE 14 O MÁS AÑOS
 # entiendo yo que es 1 persona con 14 anios o mas hay 12587 y asi para los demas
 
+encuesta_HP
+encuesta_HP_jovenes <- subset(encuesta_HP, e27 >= 18 & e27 <= 25)
+#encuesta_HP_jovenes
 
-base_trim1_jovenes <- subset(encuesta, d23 >= 18 & d23 <= 25)
-base_trim1_jovenes
+# Estimacion
+diseno_jovenes <- svydesign(
+  ids = ~1,
+  strata = ~estred13,
+  weights = ~pesotri,
+  data = encuesta_HP_jovenes,
+  nest = TRUE
+)
 
-table(encuesta$d23)
-table(encuesta$ht4) # ht4, cantidad de mayores de 60
+# Estimacion por departamento
+tasas <- svyby(
+  ~ht6,
+  ~nomdpto,  # o dpto si preferís código numérico
+  design = diseno_jovenes,
+  svymean,
+  vartype = "ci",
+  level = 0.95,
+  na.rm = TRUE
+)
+
+diseno_jovenes
+tasas
 
 ```
 
-```{r}
-encuesta
-```
+
 
 **6. Si no se contara con la información de las UPM y de los estratos, ¿cómo sería el intervalo de confianza de la parte 1)? Comente los resultados.**
 
 ```{r}
+# UPM sin estratos:
+
+diseño_simple <- svydesign(ids = ~1, weights = ~pesotri, data = hogares_trim1)
+svytotal(~ht6, diseño_simple)
+confint(svytotal(~ht6, diseño_simple))
+svytotal(~ht6, diseño_simple, deff = TRUE)
 
 ```
+
+Tenemos que el total estimado es igual para ambos casos, dado que estamos usando los mismos pesos. El error estándar (SE) es un poco mayor con el diseño que no incluye la información de las UPM y de los estratos.
+
+El intervalo de confianza es un poco más amplio cuando no consideramos la información de las UPM y de los estratos. Esto es porque al no considerar esa informacion, no se reduce la varianza y el diseño es menos eficiente.  El DEFF (factor de diseño) aumenta un poco, pasando de 1.2501 a 1.275, entonces en promedio, el muestreo que considera la informadcion sobre las UPM y los estratos introduce un 25% más de varianza que un muestreo que no considera esta informacion. (?)
+
+
+La conclusion es que si no se tiene la información sobre las UPM y los estratos, se puede hacer la estimación igual, pero los intervalos de confianza son más amplios y el diseño es menos eficiente.
+
+
+
+
+
+
+
+
 
 ```{r}
 
