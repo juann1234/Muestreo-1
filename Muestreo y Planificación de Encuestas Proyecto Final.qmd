@@ -49,7 +49,7 @@ La variable `ht6` representa el total de personas desocupadas en cada hogar, cal
 ```{r}
 set.seed(123)
 
-
+#
 # Datos
 hogares <- encuesta_HP
 hogares_trim1 <- filter(hogares, mes %in% c(1, 2, 3))
