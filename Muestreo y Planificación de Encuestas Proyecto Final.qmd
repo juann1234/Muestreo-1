@@ -17,7 +17,7 @@ library(dplyr)
 library(here)
 library(writexl)
 
-write_xlsx(encuesta_HP, "encuesta_HP.xlsx")
+#write_xlsx(encuesta_HP, "encuesta_HP.xlsx")
 ```
 
 ```{r}
@@ -49,27 +49,25 @@ La variable `ht6` representa el total de personas desocupadas en cada hogar, cal
 ```{r}
 set.seed(123)
 
-#
-# Datos
+# Filtrar primer trimestre
 hogares <- encuesta_HP
 hogares_trim1 <- filter(hogares, mes %in% c(1, 2, 3))
 
-#diseño <- svydesign(ids = ~1, weights = ~pesoano, data = hogares_trim1)
-
-# Estimar el total
+# Definir diseño muestral
 diseño <- svydesign(ids = ~1, strata = ~estred13, weights = ~pesotri, data = hogares_trim1)
-svytotal(~ht6, diseño)
-# Estimar el total
-#diseño <- svydesign(ids = ~1, weights = ~pesotri, data = hogares_trim1)
-#svytotal(~ht6, diseño)
 
+# Estimar total de personas desocupadas
+total_desocupados <- svytotal(~ht6, diseño, deff = TRUE)
 
+# Mostrar total estimado
+total_desocupados
 
-# Intervalo de confianza
-confint(svytotal(~ht6, diseño))
+# Intervalo de confianza al 95%
+confint(total_desocupados)
 
-# (DEFF)
-svytotal(~ht6, diseño, deff = TRUE)
+# Efecto de diseño (DEFF)
+deff_total <- deff(total_desocupados)
+deff_total
 
 
 
@@ -100,28 +98,29 @@ se estima que en Uruguay hay aproximadamente 36.273 personas desocupadas. El int
 
 set.seed(123)
 
+# Crear diseño replicado Bootstrap
 diseño_boot <- as.svrepdesign(diseño, type = "subbootstrap", replicates = 500)
 
-
-svytotal(~ht6, diseño)
-
-
-svytotal(~ht6, diseño_boot)
-
-
+# Estimar total con Bootstrap (guardamos replicados)
 ht6_boot <- svytotal(~ht6, diseño_boot, return.replicates = TRUE)
 
+# Mostrar intervalo de confianza al 95%
+confint(ht6_boot)
 
+# Graficar distribución empírica de los pseudo-valores bootstrap
 hist(ht6_boot$replicates,
      breaks = 20,
-     main = "Distribución de los Pseudo-valores Bootstrap para ht6",
+     main = "Distribución Bootstrap del estimador de ht6",
      xlab = "Total estimado de personas desocupadas")
 
-# Comparar errores estándar
-sd(ht6_boot$replicates)  # Bootstrap
+# Comparación de errores estándar
+SE_boot <- sd(ht6_boot$replicates)  # Bootstrap
 SE_clasico <- sqrt(attr(svytotal(~ht6, diseño), "var"))  # Clásico
 
+# Mostrar ambos errores estándar
+SE_boot
 SE_clasico
+
 
 
 ```
@@ -132,12 +131,51 @@ A partir del diseño muestral aplicado a los hogares del primer trimestre y util
 
 ```{r}
 
+set.seed(123)
+
+# Filtrar primer trimestre y Paysandú
+hogares_paysandu <- encuesta_HP %>%
+  filter(mes %in% 1:3, nomdpto == "PAYSANDU")
+
+# Definir diseño muestral
+diseño_paysandu <- svydesign(
+  ids = ~1,
+  strata = ~estred13,
+  weights = ~pesotri,
+  data = hogares_paysandu
+)
+
+# Estimar total de personas desocupadas
+total_paysandu <- svytotal(~ht6, diseño_paysandu, deff = TRUE)
+
+# Mostrar total estimado
+total_paysandu
+
+# Intervalo de confianza al 95%
+confint(total_paysandu)
 ```
 
 **4. Estime la tasa de desocupados en las personas de entre 18 y 25 años y proporcione un intervalo de confianza al 95% para esta estimación.**
 
 ```{r}
 
+encuesta_HP_jovenes <- subset(encuesta_HP, e27 >= 18 & e27 <= 25) # Personas entre 18 y 25 años
+
+
+diseño_jovenes <- svydesign(ids = ~1,           # identificador sin clusters
+                            strata = ~estred13, # estratos
+                            weights = ~pesotri, # pesos ponderadores
+                            data = encuesta_HP_jovenes) # datos filtrados de personas entre 18 y 25 años
+
+# podensmo svymean porque nos pide la tasa, media(ht6) = (numero de personas desocupadas) / (total personas)
+# igual si probas con total te da 570669  jovenes entre 18 y 25 son desempleados, bastante...
+svymean(~ht6, diseño_jovenes) # estimacion de tasa de desocupados en jovenes de entre 18 y 25 años.
+
+
+
+confint(svytotal(~ht6, diseño_jovenes))
+# Se estima que el 33.3% de las personas de entre 18 y 25 años están desocupadas.
+# Con un 95% de confianza, la verdadera tasa poblacional se encuentra entre 32.2% y 34.4%.
 
 ```
 
@@ -151,7 +189,7 @@ A partir del diseño muestral aplicado a los hogares del primer trimestre y util
 # la variable d23 indica PERSONAS DE 14 O MÁS AÑOS
 # entiendo yo que es 1 persona con 14 anios o mas hay 12587 y asi para los demas
 
-encuesta_HP
+#encuesta_HP
 encuesta_HP_jovenes <- subset(encuesta_HP, e27 >= 18 & e27 <= 25)
 #encuesta_HP_jovenes
 
@@ -169,14 +207,18 @@ tasas <- svyby(
   ~ht6,
   ~nomdpto,  # o dpto si preferís código numérico
   design = diseno_jovenes,
-  svymean,
+  svytotal,
   vartype = "ci",
   level = 0.95,
   na.rm = TRUE
 )
 
-diseno_jovenes
 tasas
+
+#diseno_jovenes
+#tasas
+
+#sum(tasas$ht6) si sumamos por departamento vemos que la cantidad de desempleados entre 18 y 25 años desagregado por departamento es igual a el total de desempleados original entre 18 y 25 años.
 
 ```
 
