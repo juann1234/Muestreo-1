@@ -32,11 +32,10 @@ encuesta_HP <- read_sav(here("Datos", "HyP_2019_Terceros.sav")) # la union de lo
 #encuesta_P
 encuesta_HP
 
-
-
+# Podriamos usar upm_fic del dataframe diseno como argumento en ids~1
 diseno <- read_sav(here("Datos", "ESTRATO_UPM_ECH2019.sav"))
 #encuesta
-#diseno
+diseno
 ```
 
 ## Se pide:
@@ -54,7 +53,7 @@ hogares <- encuesta_HP
 hogares_trim1 <- filter(hogares, mes %in% c(1, 2, 3))
 
 # Definir diseño muestral
-diseño <- svydesign(ids = ~1, strata = ~estred13, weights = ~pesotri, data = hogares_trim1)
+diseño <- svydesign(ids = ~diseno$upm_fic, strata = ~estred13, weights = ~pesotri, data = hogares_trim1)
 
 # Estimar total de personas desocupadas
 total_desocupados <- svytotal(~ht6, diseño, deff = TRUE)
@@ -70,8 +69,15 @@ deff_total <- deff(total_desocupados)
 deff_total
 
 
+#     total     SE   DEff
+# ht6 614053  11254 1.2501
+#        2.5 %   97.5 %
+# ht6 591995.4 636110.6
+#      ht6 
+# 1.250133 
 
 
+# 4
 ```
 
 ```{r}
@@ -139,7 +145,7 @@ hogares_paysandu <- encuesta_HP %>%
 
 # Definir diseño muestral
 diseño_paysandu <- svydesign(
-  ids = ~1,
+  ids = ~numero,
   strata = ~estred13,
   weights = ~pesotri,
   data = hogares_paysandu
@@ -153,6 +159,9 @@ total_paysandu
 
 # Intervalo de confianza al 95%
 confint(total_paysandu)
+
+
+# El total de personas desocupadas en Paysandu es de 15475
 ```
 
 **4. Estime la tasa de desocupados en las personas de entre 18 y 25 años y proporcione un intervalo de confianza al 95% para esta estimación.**
@@ -162,7 +171,7 @@ confint(total_paysandu)
 encuesta_HP_jovenes <- subset(encuesta_HP, e27 >= 18 & e27 <= 25) # Personas entre 18 y 25 años
 
 
-diseño_jovenes <- svydesign(ids = ~1,           # identificador sin clusters
+diseño_jovenes <- svydesign(ids = ~numero,           # identificador sin clusters
                             strata = ~estred13, # estratos
                             weights = ~pesotri, # pesos ponderadores
                             data = encuesta_HP_jovenes) # datos filtrados de personas entre 18 y 25 años
@@ -177,6 +186,12 @@ confint(svytotal(~ht6, diseño_jovenes))
 # Se estima que el 33.3% de las personas de entre 18 y 25 años están desocupadas.
 # Con un 95% de confianza, la verdadera tasa poblacional se encuentra entre 32.2% y 34.4%.
 
+
+# con ids
+#  mean     SE
+# ht6 0.33276 0.0057
+#        2.5 %   97.5 %
+# ht6 551161.9 590176.1
 ```
 
 ```{r}
@@ -229,10 +244,14 @@ tasas
 ```{r}
 # UPM sin estratos:
 
-diseño_simple <- svydesign(ids = ~1, weights = ~pesotri, data = hogares_trim1)
+diseño_simple <- svydesign(ids = ~numero, weights = ~pesotri, data = hogares_trim1)
 svytotal(~ht6, diseño_simple)
 confint(svytotal(~ht6, diseño_simple))
 svytotal(~ht6, diseño_simple, deff = TRUE)
+
+
+# con estratos: 561627.5 666478.5 mas chico
+# sin estratos: 561355.4 666750.6 mas grande
 
 ```
 
