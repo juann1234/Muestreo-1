@@ -49,16 +49,21 @@ df_unido
 #df_unido[, c("estred13", "estrato")]
 
 
+table(encuesta_P$f89)
+
 ```
 
 
 ```{r}
-sd1 <- svydesign(id = ~upm_fic, strata = ~estrato, weights = ~pesomen, data = df_unido)
-sd1
+diseño1 <- svydesign(ids = ~upm_fic, strata = ~estred13, weights = ~pesomen, data = df_unido)
+diseño1
 
+diseño1 <- svydesign(ids = ~diseno$upm_fic, strata = ~estred13, weights = ~pesomen, data = encuesta_P)
 
 # usar estred13 del dataframe o estrato de la base de datos de diseño? La que rinda mejor supongo.
-
+dim(diseno)
+dim(encuesta_P)
+encuesta_P
 #encuesta_HP
 # weights = pesomen ponderador mensual, que es el factor que indica la representatividad de un elemento muestral en la poblacion.
 ```
@@ -80,7 +85,7 @@ hogares_trim1 <- filter(hogares, mes %in% c(1, 2, 3))
 
 # Definir diseño muestral
 #diseño <- svydesign(ids = ~upm_fic, strata = ~estred13, weights = ~pesotri, data = hogares_trim1)\
-diseño <- svydesign(id = ~upm_fic, strata = ~estred13, weights = ~pesomen, data = df_unido)
+diseño1 <- svydesign(ids = ~upm_fic, strata = ~estred13, weights = ~pesomen, data = hogares_trim1)
 total_desocupados <- svytotal(~f89, diseño, deff = TRUE)
 total_desocupados
 
@@ -89,7 +94,7 @@ total_desocupados
 # total_desocupados <- svytotal(~f89, diseño, deff = TRUE) # Estimar total de personas desocupadas
 # total_desocupados # Mostrar total estimado
 # Cuando use estred13 obtengo un Error estándar (SE) más bajo cuando se usa estred13, o sea mayor precisión. Ademas el DEff (Design Effect), también es más bajo con estred13, o sea el muestreo es más eficiente respecto al muestreo aleatorio simple.
-
+table(hogares_trim1$f89)
 
 # Intervalo de confianza al 95%
 confint(total_desocupados)
