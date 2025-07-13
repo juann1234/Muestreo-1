@@ -72,6 +72,7 @@ encuesta_P
     ***
 
 La variable `ht6` representa el total de personas desocupadas en cada hogar, calculada por el sistema a partir de la información individual de los integrantes del hogar (excluyendo servicio doméstico). Esta variable incluye a todas las personas que, según la clasificación del INE, se consideran desocupadas, ya sea porque están buscando empleo y disponibles para trabajar, porque están disponibles pero no buscan, o porque buscan sin estar disponibles.\
+
 ```{r}
 table(hogares$pobpcoac)
 # 3	Desocupados por primera vez
@@ -79,8 +80,6 @@ table(hogares$pobpcoac)
 # 5	Desocupados en seguro de paro
 
 ```
-
-
 
 ```{r}
 # Segun ChatGPT
@@ -288,14 +287,15 @@ confint(total_desocupados_simple)
 # Intervalo de confianza con informacion:  109019.6 127714.4
 # Intervalo de confianza sin informacion:  109857.7 126876.3
 # mas amplio el que tiene informacion
-
+#
 ```
 
 Tenemos que el total estimado es igual para ambos casos, dado que estamos usando los mismos pesos. El error estándar (SE) es un poco mayor con el diseño que no incluye la información de las UPM y de los estratos.
 
-Al comparar los intervalos de confianza para la estimación del total de personas desocupadas en el primer trimestre de 2019, se observa que las estimaciones puntuales iguales, con y sin información del diseño muestral, pero en intervalo en el caso del que considera la informacion de las UPM y los estratos, el intervalo con diseño es un poco mas amplio. Dado que al considerar la estructura de muestreo (estratos y conglomerados), se ajusta la varianza de la estimación, haciendo el intervalo más realista. Si ignoramos esta informacion, se puede subestimar o sobreestimar la precisión, segun de la forma del diseño. 
+Al comparar los intervalos de confianza para la estimación del total de personas desocupadas en el primer trimestre de 2019, se observa que las estimaciones puntuales iguales, con y sin información del diseño muestral, pero en intervalo en el caso del que considera la informacion de las UPM y los estratos, el intervalo con diseño es un poco mas amplio. Dado que al considerar la estructura de muestreo (estratos y conglomerados), se ajusta la varianza de la estimación, haciendo el intervalo más realista. Si ignoramos esta informacion, se puede subestimar o sobreestimar la precisión, segun de la forma del diseño.
 
 
+.
 
 ```{r}
 
