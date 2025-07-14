@@ -1,0 +1,267 @@
+---
+title: "Muestreo y Planificación de Encuestas Proyecto Final"
+author: "Grupo 7: Apolo - Roda - Da Rosa"
+format: pdf
+editor: visual
+---
+
+## Introducción:
+
+En el presente trabajo se utilizará la base de datos de la Encuesta Continua de Hogares (ECH) de Uruguay correspondiente al año 2019, disponible en el repositorio del Instituto Nacional de Estadística (INE) y también proporcionada en el aula virtual del curso. El objetivo principal es aplicar herramientas de muestreo y estimación estadística para procesar información real y analizar la situación de desocupación en distintos segmentos de la población.
+
+```{r}
+#|output: false
+#|warning: false
+# Librerias
+library(survey)
+library(haven)
+library(dplyr)
+library(here)
+
+```
+
+```{r}
+#|output: false
+#|warning: false
+encuesta_P <- read_sav(here("Datos", "P_2019_Terceros.sav"))
+#encuesta_P
+
+encuesta_P
+
+diseno <- read_sav(here("Datos", "ESTRATO_UPM_ECH2019.sav"))
+#diseno
+
+
+
+hogares <- merge(encuesta_P, diseno, by = "numero")
+#hogares
+
+
+
+
+
+```
+
+```{r}
+#|output: false
+#|warning: false
+diseño1 <- svydesign(ids = ~upm_fic, strata = ~estrato, weights = ~pesomen, data = hogares)
+diseño1
+
+dim(diseno)
+dim(encuesta_P)
+encuesta_P
+```
+
+## Se pide:
+
+1.  ***Estime el total de personas desocupadas en el primer trimestre del año y proporcione un intervalo de confianza al 95% para este total. ¿Cúanto vale el deff en este caso?\
+    ***
+
+En primer lugar, se estimó el total de personas desocupadas a nivel nacional, obteniéndose un valor de aproximadamente **118367 personas**, con un error estándar de **4769** y un diseño efectivo (DEff) de **1.4331**, lo que indica que la varianza del estimador bajo el diseño muestral real es 1.43 veces mayor que la que se obtendría bajo muestreo aleatorio simple (MAS). El intervalo de confianza al 95% fue **\[109020; 127714\]**, lo que refleja una cierta incertidumbre en la estimación pero mantiene un margen aceptable considerando el tamaño de la población.\
+
+```{r}
+#|output: True
+#|warning: false
+table(hogares$pobpcoac)
+# 3	Desocupados por primera vez
+# 4	Desocupados propiamente dichos
+# 5	Desocupados en seguro de paro
+
+```
+
+```{r}
+#|output: True
+#|warning: false
+
+# Semilla Reproducibilidad
+set.seed(123)
+
+# Desocupados
+hogares <- hogares %>%
+  mutate(desocupado = as.numeric(pobpcoac == 4))
+
+
+# Filtrar primer trimestre
+library(dplyr)
+
+# Datos Primer Semestre
+hogares_trim1 <- filter(hogares, mes %in% c(1, 2, 3))
+
+
+# diseño
+diseño1 <- svydesign(   # funcion
+  id = ~upm_fic,        # identificador de las UPM (Unidades Primarias de Muestreo)
+  strata = ~estrato,    # parametro de los estratos
+  weights = ~pesotri,   # ponderador, que sera el peso mensual
+  data = hogares_trim1  # datos del primer semestre 
+)
+
+# Totales, Intervalos, Deff
+total_desocupados <- svytotal(~desocupado, diseño1, deff = TRUE)  # Total de desocupados primer
+total_desocupados
+confint(total_desocupados) # Intervalo de confianza al 95%
+deff_total <- deff(total_desocupados) # Efecto de diseño (DEFF)
+deff_total
+
+```
+
+\
+
+2.  **Obtenga un intervalo de confianza al 95% para el total estimado en la parte anterior utilizando el método Bootstrap y compare con el punto anterior. Obtenga la distribución empírica del estimador.**
+
+Luego, se utilizó el método **bootstrap** como alternativa no paramétrica para estimar el intervalo de confianza del mismo total. En este caso, el intervalo resultó ser **\[109172; 127562\]**, muy cercano al anterior, lo que sugiere que ambos métodos convergen a estimaciones similares. Además, se muestra la **distribución empírica del estimador** obtenida por bootstrap, representada en el histograma, donde se observa una forma aproximadamente simétrica y ligeramente sesgada hacia la derecha, con la mayoría de las replicaciones agrupadas entre los 115.000 y los 125.000 desocupados. Esta distribución refuerza la confiabilidad del estimador puntual y respalda la validez del intervalo.
+
+```{r}
+
+#|output: True
+#|warning: false
+
+# Reproducibilidad
+set.seed(123)
+
+# Diseño bootstrap
+diseño_boot <- as.svrepdesign(diseño1, type = "subbootstrap", replicates = 500)
+
+# Total
+desocupados_boot <- svytotal(~desocupado, diseño_boot, return.replicates = TRUE)
+
+# Mostrar intervalo de confianza al 95% con bootstrap
+confint(desocupados_boot)
+
+# Histograma
+hist(desocupados_boot$replicates,
+     breaks = 20,
+     main = "Distribución Bootstrap del estimador de ht6",
+     xlab = "Total estimado de personas desocupadas")
+
+# Desvio
+SE_boot <- sd(desocupados_boot$replicates)  # Bootstrap
+SE_clasico <- sqrt(attr(svytotal(~desocupado, diseño1), "var"))  # Clásico
+SE_boot
+SE_clasico
+
+
+```
+
+**3. Estime el total de personas desocupadas en el primer trimestre del año en Paysandú y proporcione un intervalo de confianza al 95% para este total.**
+
+Se realizó también un análisis por departamento, en particular para **Paysandú**, donde se estimó un total de **3111 personas desocupadas**, con un error estándar de **683.8** y un intervalo de confianza de **\[1771; 4451\]**, lo cual refleja mayor variabilidad relativa debido al tamaño muestral reducido en ese dominio.
+
+```{r}
+#|output: True
+#|warning: false
+
+# Reproducibilidad
+set.seed(123)
+
+# Filtrar Paysandu
+hogares_paysandu <- hogares %>%
+  filter(mes %in% 1:3, nomdpto == "PAYSANDU")
+
+# diseño
+diseño_paysandu <- svydesign(
+  id = ~upm_fic,
+  strata = ~estrato,
+  weights = ~pesotri,
+  data = hogares_paysandu
+)
+
+# Total
+total_paysandu <- svytotal(~desocupado, diseño_paysandu, deff = TRUE)
+total_paysandu # Mostrar total estimado
+
+
+# Intervalo de confianza al 95%
+confint(total_paysandu)
+
+
+```
+
+**4. Estime la tasa de desocupados en las personas de entre 18 y 25 años y proporcione un intervalo de confianza al 95% para esta estimación.**
+
+En relación con los **jóvenes entre 18 y 25 años**, la **tasa de desocupación** estimada fue del **11.1%**, con un error estándar de 0.0031. Esto implica que aproximadamente uno de cada diez jóvenes en ese rango etario se encuentra desocupado, dato particularmente relevante para el diseño de políticas públicas focalizadas. El total poblacional estimado para este grupo fue de **190864 personas**.
+
+```{r}
+#|output: True
+#|warning: false
+
+# Filtrar edades
+encuesta_HP_jovenes <- subset(hogares, e27 >= 18 & e27 <= 25) # Personas entre 18 y 25 años
+
+
+# Diseño
+diseño_jovenes <- svydesign(id = ~upm_fic,              # identificador sin clusters
+                            strata = ~estrato,          # estratos
+                            weights = ~pesotri,         # ponderador anual
+                            data = encuesta_HP_jovenes) # datos de personas entre 
+
+
+
+
+# Tasa
+svymean(~desocupado, diseño_jovenes) # estimacion de tasa de desocupados en jovenes de entre 18 y 25 años.
+svytotal(~desocupado, diseño_jovenes) 
+
+
+```
+
+**5. Estime tasa de desocupados en las personas de entre 18 y 25 por departamento y proporcione un intervalo de confianza al 95% para cada dominio.\
+\
+**Este análisis se profundizó por departamento, donde se estimaron tasas de desocupación juveniles para distintos dominios geográficos. Por ejemplo, en Montevideo se estimaron alrededor de **72707 jóvenes desocupados**, con un intervalo de confianza estrecho que refleja mayor precisión dada la mayor representación muestral en esa zona. En cambio, departamentos como Flores o Lavalleja presentan estimaciones más inestables con márgenes de error más amplios, lo que indica precaución en la interpretación a nivel subnacional.
+
+```{r}
+
+#|output: True
+#|warning: false
+
+# Filtrar edades
+encuesta_HP_jovenes <- subset(hogares, e27 >= 18 & e27 <= 25)
+
+
+# Diseño 
+diseño_jovenes <- svydesign(id = ~upm_fic,              # identificador sin clusters
+                            strata = ~estrato,          # estratos
+                            weights = ~pesotri,         # ponderador anual
+                            data = encuesta_HP_jovenes) # datos de personas entre 
+
+# Estimacion de tasas
+tasas <- svyby(
+  ~desocupado, # variable
+  ~nomdpto,  # o dpto si preferís código numérico
+  design = diseño_jovenes, # diseño
+  svytotal,                # total
+  vartype = "ci",          # intervalos de confianza
+  level = 0.95,            # nivel de confianza
+  na.rm = TRUE             # sin nulos
+)
+
+# Resultado
+tasas
+
+
+```
+
+**6. Si no se contara con la información de las UPM y de los estratos, ¿cómo sería el intervalo de confianza de la parte 1)? Comente los resultados.\
+\
+**Finalmente, se evaluó cómo cambiarían las estimaciones si no se contara con la información de **unidades primarias de muestreo (UPM)** ni de **estratos**, es decir, si se aplicara un supuesto de muestreo aleatorio simple. En ese caso, el total estimado permanece igual (118367), pero el error estándar disminuye a **4341**, y el intervalo de confianza se reduce a **\[109858; 126876\]**. Sin embargo, este resultado es engañoso, ya que al ignorar la estructura del diseño muestral, se subestima la verdadera variabilidad del estimador. Esto resalta la importancia de considerar el diseño muestral en los análisis, ya que proporciona estimaciones más realistas y conservadoras de la incertidumbre.
+
+```{r}
+#|output: True
+#|warning: false
+
+# Diseño sin UPM y sin estratos:
+diseño_simple <- svydesign(
+  id = ~1,
+  weights = ~pesotri,
+  data = hogares_trim1
+)
+
+
+# Total y Intervalo
+total_desocupados_simple <- svytotal(~desocupado, diseño_simple)
+total_desocupados_simple
+confint(total_desocupados_simple)
+
+```
+
