@@ -212,7 +212,7 @@ svytotal(~desocupado, diseño_jovenes)
 **Este análisis se profundizó por departamento, donde se estimaron tasas de desocupación juveniles para distintos dominios geográficos. Por ejemplo, en Montevideo se estimaron alrededor de **72707 jóvenes desocupados**, con un intervalo de confianza estrecho que refleja mayor precisión dada la mayor representación muestral en esa zona. En cambio, departamentos como Flores o Lavalleja presentan estimaciones más inestables con márgenes de error más amplios, lo que indica precaución en la interpretación a nivel subnacional.\
 
 ```{r}
-
+#| output: true
 
 # Filtrar edades
 encuesta_HP_jovenes <- subset(hogares, e27 >= 18 & e27 <= 25)
