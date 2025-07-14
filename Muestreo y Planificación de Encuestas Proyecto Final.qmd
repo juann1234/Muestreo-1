@@ -17,9 +17,7 @@ library(survey)
 library(haven)
 library(dplyr)
 library(here)
-#library(writexl)
 
-#write_xlsx(encuesta_HP, "encuesta_HP.xlsx")
 ```
 
 ```{r}
@@ -29,11 +27,8 @@ encuesta_P <- read_sav(here("Datos", "P_2019_Terceros.sav"))
 encuesta_P
 
 encuesta_P
-#encuesta_HP
 
-# Podriamos usar upm_fic del dataframe diseno como argumento en ids~1
 diseno <- read_sav(here("Datos", "ESTRATO_UPM_ECH2019.sav"))
-#encuesta
 diseno
 
 
@@ -56,8 +51,6 @@ diseño1
 dim(diseno)
 dim(encuesta_P)
 encuesta_P
-#encuesta_HP
-# weights = pesomen ponderador mensual, que es el factor que indica la representatividad de un elemento muestral en la poblacion.
 ```
 
 ## Se pide:
@@ -81,8 +74,10 @@ table(hogares$pobpcoac)
 #|output: True
 #|warning: false
 
+# Semilla Reproducibilidad
 set.seed(123)
 
+# Desocupados
 hogares <- hogares %>%
   mutate(desocupado = as.numeric(pobpcoac == 4))
 
@@ -90,11 +85,11 @@ hogares <- hogares %>%
 # Filtrar primer trimestre
 library(dplyr)
 
-
+# Datos Primer Semestre
 hogares_trim1 <- filter(hogares, mes %in% c(1, 2, 3))
 
 
-
+# diseño
 diseño1 <- svydesign(   # funcion
   id = ~upm_fic,        # identificador de las UPM (Unidades Primarias de Muestreo)
   strata = ~estrato,    # parametro de los estratos
@@ -102,6 +97,7 @@ diseño1 <- svydesign(   # funcion
   data = hogares_trim1  # datos del primer semestre 
 )
 
+# Totales, Intervalos, Deff
 total_desocupados <- svytotal(~desocupado, diseño1, deff = TRUE)  # Total de desocupados primer
 total_desocupados
 confint(total_desocupados) # Intervalo de confianza al 95%
@@ -121,27 +117,27 @@ Luego, se utilizó el método **bootstrap** como alternativa no paramétrica par
 #|output: True
 #|warning: false
 
-
+# Reproducibilidad
 set.seed(123)
 
-
+# Diseño bootstrap
 diseño_boot <- as.svrepdesign(diseño1, type = "subbootstrap", replicates = 500)
 
-
+# Total
 desocupados_boot <- svytotal(~desocupado, diseño_boot, return.replicates = TRUE)
 
-# Mostrar intervalo de confianza al 95%
+# Mostrar intervalo de confianza al 95% con bootstrap
 confint(desocupados_boot)
 
-
+# Histograma
 hist(desocupados_boot$replicates,
      breaks = 20,
      main = "Distribución Bootstrap del estimador de ht6",
      xlab = "Total estimado de personas desocupadas")
 
+# Desvio
 SE_boot <- sd(desocupados_boot$replicates)  # Bootstrap
 SE_clasico <- sqrt(attr(svytotal(~desocupado, diseño1), "var"))  # Clásico
-
 SE_boot
 SE_clasico
 
@@ -155,13 +151,15 @@ Se realizó también un análisis por departamento, en particular para **Paysand
 ```{r}
 #|output: True
 #|warning: false
+
+# Reproducibilidad
 set.seed(123)
 
-
+# Filtrar Paysandu
 hogares_paysandu <- hogares %>%
   filter(mes %in% 1:3, nomdpto == "PAYSANDU")
 
-
+# diseño
 diseño_paysandu <- svydesign(
   id = ~upm_fic,
   strata = ~estrato,
@@ -169,8 +167,11 @@ diseño_paysandu <- svydesign(
   data = hogares_paysandu
 )
 
+# Total
 total_paysandu <- svytotal(~desocupado, diseño_paysandu, deff = TRUE)
 total_paysandu # Mostrar total estimado
+
+
 # Intervalo de confianza al 95%
 confint(total_paysandu)
 
@@ -185,9 +186,11 @@ En relación con los **jóvenes entre 18 y 25 años**, la **tasa de desocupació
 #|output: True
 #|warning: false
 
+# Filtrar edades
 encuesta_HP_jovenes <- subset(hogares, e27 >= 18 & e27 <= 25) # Personas entre 18 y 25 años
 
 
+# Diseño
 diseño_jovenes <- svydesign(id = ~upm_fic,              # identificador sin clusters
                             strata = ~estrato,          # estratos
                             weights = ~pesotri,         # ponderador anual
@@ -196,9 +199,9 @@ diseño_jovenes <- svydesign(id = ~upm_fic,              # identificador sin clu
 
 
 
-
+# Tasa
 svymean(~desocupado, diseño_jovenes) # estimacion de tasa de desocupados en jovenes de entre 18 y 25 años.
-svytotal(~desocupado, diseño_jovenes) 
+#svytotal(~desocupado, diseño_jovenes) 
 
 
 ```
@@ -211,24 +214,29 @@ svytotal(~desocupado, diseño_jovenes)
 
 #|output: True
 #|warning: false
+
+# Filtrar edades
 encuesta_HP_jovenes <- subset(hogares, e27 >= 18 & e27 <= 25)
 
 
-# Estimacion
+# Diseño 
 diseño_jovenes <- svydesign(id = ~upm_fic,              # identificador sin clusters
                             strata = ~estrato,          # estratos
                             weights = ~pesotri,         # ponderador anual
                             data = encuesta_HP_jovenes) # datos de personas entre 
+
+# Estimacion de tasas
 tasas <- svyby(
-  ~desocupado,
+  ~desocupado, # variable
   ~nomdpto,  # o dpto si preferís código numérico
-  design = diseño_jovenes,
-  svytotal,
-  vartype = "ci",
-  level = 0.95,
-  na.rm = TRUE
+  design = diseño_jovenes, # diseño
+  svytotal,                # total
+  vartype = "ci",          # intervalos de confianza
+  level = 0.95,            # nivel de confianza
+  na.rm = TRUE             # sin nulos
 )
 
+# Resultado
 tasas
 
 
@@ -241,6 +249,7 @@ tasas
 ```{r}
 #|output: True
 #|warning: false
+
 # Diseño sin UPM y sin estratos:
 diseño_simple <- svydesign(
   id = ~1,
@@ -248,6 +257,8 @@ diseño_simple <- svydesign(
   data = hogares_trim1
 )
 
+
+# Total y Intervalo
 total_desocupados_simple <- svytotal(~desocupado, diseño_simple)
 total_desocupados_simple
 confint(total_desocupados_simple)
